@@ -239,12 +239,14 @@ class Client:
         a dict of encoded files
         """
         url = url + f'?api_key={self.api_key}'
+        # response_from_related is of type dict
         response_from_related = requests.get(url, timeout=10).json()
 
         # Get attachments
         try:
             file_urls, file_types = \
                 get_urls_and_formats(
+                    # example: {"data" : []}
                     response_from_related["data"][0]
                     ["attributes"]["fileFormats"])
         except IndexError:
@@ -290,7 +292,11 @@ class Client:
         print('Processing job from work server')
         job = self.get_job()
         if job['job_type'] == 'attachments':
-            result = self.perform_attachment_job(job['url'], job['job_id'])
+            # Maybe we can try to catch the IndexError here?
+            try:
+                result = self.perform_attachment_job(job['url'], job['job_id'])
+            except IndexError:
+                print("Index Error")
         else:
             result = self.perform_job(job['url'])
         self.send_job(job, result)

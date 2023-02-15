@@ -387,3 +387,43 @@ def test_get_output_path_error():
     output_path = get_output_path(results)
 
     assert output_path == -1
+
+
+def test_attachments_get_index_error_exception(mock_requests):
+    """
+    When a comment from Regulations.gov has no attachments, returns:
+    {
+    "data" : [ ]
+    }
+    IndexError excepton when data is empty
+    """
+    client = Client()
+    client.api_key = 1234
+
+    with mock_requests:
+        mock_requests.get(
+            'http://work_server:8080/get_job?client_id=-1',
+            json={'job_id': '1',
+                  'url': 'http://url.com',
+                  'job_type': 'attachments',
+                  'reg_id': '1',
+                  'agency': 'foo'},
+            status_code=200
+        )
+
+        mock_requests.get(
+            'http://url.com?api_key=1234',
+            json={"data": []},
+            status_code=200
+        )
+
+        with pytest.raises(IndexError):
+            mock_requests.put('http://work_server:8080/put_results', text='{}')
+            client.job_operation()
+            
+            # Not sure how useful code below is 
+            put_request = mock_requests.request_history[-1]
+            json_data = json.loads(put_request.json())
+            print(json_data)
+            # json_data looks like: {'job_type': 'attachments', 'job_id': '1',
+            # 'results': {}, 'reg_id': '1', 'agency': 'foo'}
