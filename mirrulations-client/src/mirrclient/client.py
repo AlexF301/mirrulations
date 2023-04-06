@@ -7,6 +7,7 @@ import requests
 from dotenv import load_dotenv
 from mirrclient.saver import Saver
 from mirrcore.path_generator import PathGenerator
+from mirrcore.jobs_statistics import JobStatistics
 
 
 class NoJobsAvailableException(Exception):
@@ -62,6 +63,7 @@ class Client:
         self.client_id = os.getenv('ID')
         self.path_generator = PathGenerator()
         self.saver = Saver()
+        self.cache = JobStatistics()
 
         hostname = os.getenv('WORK_SERVER_HOSTNAME')
         port = os.getenv('WORK_SERVER_PORT')
@@ -124,12 +126,13 @@ class Client:
             data['directory'] = self.path_generator.get_path(job_result)
 
         self._put_results(data)
-        self.put_results_to_mongo(data)
+        self.cache.increase_jobs_done(data['job_type'])
         comment_has_attachment = self.does_comment_have_attachment(job_result)
         json_has_file_format = self._document_has_file_formats(job_result)
 
         if data["job_type"] == "comments" and comment_has_attachment:
             self.download_all_attachments_from_comment(data, job_result)
+            self.cache.increase_jobs_done('attachment')
         if data["job_type"] == "documents" and json_has_file_format:
             document_htm = self._get_document_htm(job_result)
             if document_htm is not None:
@@ -244,7 +247,6 @@ class Client:
         print(f"SAVED attachment - {url} to path: ", path)
         filename = path.split('/')[-1]
         data = self.add_attachment_information_to_data(data, path, filename)
-        self.put_results_to_mongo(data)
 
     def add_attachment_information_to_data(self, data, path, filename):
         data['job_type'] = 'attachments'

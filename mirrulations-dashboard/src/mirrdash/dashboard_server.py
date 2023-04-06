@@ -11,19 +11,19 @@ import os
 from flask import Flask, jsonify, render_template
 from flask_cors import CORS
 from mirrcore.job_queue import JobQueue
+from mirrcore.jobs_statistics import JobStatistics
 from mirrcore.job_queue_exceptions import JobQueueException
-from mirrdash.sum_mongo_counts import connect_mongo_db, get_done_counts
 from dotenv import load_dotenv
 from redis import Redis
 import docker
 
 
 class Dashboard:
-    def __init__(self, job_queue, docker_server, mongo_client):
+    def __init__(self, job_queue, docker_server):
         self.app = Flask(__name__)
         self.job_queue = job_queue
         self.docker = docker_server
-        self.mongo = mongo_client
+        self.cache = JobStatistics()
         CORS(self.app, resources={r'/data': {'origins': '*'}})
         CORS(self.app, resources={r'/devdata': {'origins': '*'}})
 
@@ -53,8 +53,8 @@ def get_container_name(container_name):
     return '_'.join(long_name_lst)
 
 
-def create_server(job_queue, docker_server, mongo_client):
-    dashboard = Dashboard(job_queue, docker_server, mongo_client)
+def create_server(job_queue, docker_server):
+    dashboard = Dashboard(job_queue, docker_server)
 
     @dashboard.app.route('/', methods=['GET'])
     def _index():
@@ -80,9 +80,9 @@ def create_server(job_queue, docker_server, mongo_client):
             # javascript will recognize something went wrong and reflect status
             return {'num_jobs_waiting': None}, error.status_code
 
-        # Get the number of jobs done from the mongo db
+        # Get the number of jobs done from the redis
         # and add it to the data
-        jobs_done_info = get_done_counts(dashboard.mongo, 'mirrulations')
+        jobs_done_info = dashboard.cache.get_jobs_done()
         data.update(jobs_done_info)
 
         # Add this value to the total jobs
@@ -105,8 +105,9 @@ def create_server(job_queue, docker_server, mongo_client):
 if __name__ == '__main__':
     load_dotenv()
     mongo_host = os.getenv('MONGO_HOSTNAME')
-    the_job_queue = JobQueue(Redis(os.getenv('REDIS_HOSTNAME')))
+    redis = Redis(os.getenv('REDIS_HOSTNAME'))
+    the_job_queue = JobQueue(redis)
     server = create_server(the_job_queue,
-                           docker.from_env(),
-                           connect_mongo_db(mongo_host, 27017))
+                           docker.from_env()
+                           )
     server.app.run(port=5000)
