@@ -1,13 +1,12 @@
 import os
 import time
 import dotenv
-import redis
 from mirrgen.search_iterator import SearchIterator
 from mirrgen.results_processor import ResultsProcessor
 from mirrcore.regulations_api import RegulationsAPI
 from mirrcore.job_queue import JobQueue
 from mirrcore.job_queue_exceptions import JobQueueException
-from mirrcore.redis_check import is_redis_available
+from mirrcore.redis_check import load_redis
 
 
 class WorkGenerator:
@@ -40,12 +39,7 @@ if __name__ == '__main__':
         dotenv.load_dotenv()
         api = RegulationsAPI(os.getenv('API_KEY'))
 
-        # Checks if redis database is available
-        database = redis.Redis('redis')
-        # Sleep for 30 seconds to give time to load
-        while not is_redis_available(database):
-            print("Redis database is busy loading")
-            time.sleep(30)
+        database = load_redis()
 
         job_queue = JobQueue(database)
 

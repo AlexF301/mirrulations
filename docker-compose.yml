@@ -67,13 +67,16 @@ services:
       context: .
       dockerfile: mirrulations-validation/Dockerfile
     depends_on:
-      - redis
-      - mongo
-      - work_generator
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     env_file: env_files/validator.env
     restart: always
     volumes:
-      - "./:/app/validator"
+      - "~/data/validator:/data"
   work_server:
     build:
       context: .

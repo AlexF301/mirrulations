@@ -19,6 +19,15 @@ there are `pytest.ini` files in each module as well as a global `pytest.ini`.
 * NOTE: Sometimes if `pytest` is installed globally, the virtual environment will use that instead. Simply exit and reenter the virtual environment to resolve this.
   Alternatively, uninstall `pytest` from the global packages (`pip3 uninstall pytest` in new terminal).
 
+## Checking Test Coverage
+
+### To check the test coverage of your code using Pytest, follow these steps:
+
+* Open a terminal or file explorer window and navigate to your project directory.
+* Find the htmlcov folder and open it.
+* Inside the htmlcov folder, locate the index.html file and open it on your browser typing `open index.html`.
+
+#### The index.html file will display the test coverage report, showing you which lines of code were executed during the test run and which were not.
 
 ## Setup for Local Launch
 

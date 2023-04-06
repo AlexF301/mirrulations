@@ -762,3 +762,92 @@ def test_add_attachment_information_to_data():
     assert data['job_type'] == 'attachments'
     assert data['attachment_path'] == '/data/data/USTR/docket.json'
     assert data['attachment_filename'] == 'docket.json'
+
+
+def test_download_htm(capsys, mocker, mock_requests):
+    mocker.patch('mirrclient.saver.Saver.make_path', return_value=None)
+    mocker.patch('mirrclient.saver.Saver.save_attachment', return_value=None)
+
+    client = Client()
+
+    pdf = "https://downloads.regulations.gov/USTR/content.pdf"
+    htm = "https://downloads.regulations.gov/USTR/content.htm"
+    htm_json = {
+            "data": {
+                "attributes": {
+                    "fileFormats": [{
+                        "fileUrl": pdf,
+                        "format": "pdf",
+                        "size": 182010
+                        }, {
+                        "fileUrl": htm,
+                        "format": "htm",
+                        "size": 9709
+                        }
+                    ]
+                }
+            }
+        }
+
+    with mock_requests:
+        mock_requests.get(
+            htm,
+            json={"data": 'foobar'},
+            status_code=200
+        )
+
+        client.download_htm(htm_json)
+        captured = capsys.readouterr().out
+        assert f"SAVED document HTM - {htm} to path:" in captured
+
+
+def test_downloading_htm_send_job(capsys, mock_requests, mocker):
+    mocker.patch('mirrclient.saver.Saver.make_path', return_value=None)
+    mocker.patch('mirrclient.saver.Saver.save_attachment', return_value=None)
+    client = Client()
+    client.api_key = 1234
+
+    with mock_requests:
+        mock_requests.get(
+            'http://work_server:8080/get_job?client_id=-1',
+            json={'job_id': '1',
+                  'url': 'https://api.regulations.gov/v4/documents/type_id',
+                  'job_type': 'documents',
+                  'reg_id': '1',
+                  'agency': 'foo'},
+            status_code=200
+        )
+        mock_requests.get(
+            'https://api.regulations.gov/v4/documents/type_id?api_key=1234',
+            json={'data': {'id': '1', 'type': 'documents',
+                           'attributes':
+                           {'agencyId': 'NOAA', 'docketId': 'NOAA-0001-0001',
+                            "fileFormats": [{
+                               "fileUrl": ("https://downloads.regulations."
+                                            "gov/USTR-2015-0010-0001/"
+                                            "content.htm"),
+                               "format": "htm",
+                               "size": 9709
+                            }]},
+                           'job_type': 'documents'}},
+            status_code=200
+        )
+        mock_requests.put('http://work_server:8080/put_results', text='{}')
+        mock_requests.get('https://downloads.regulations.gov/'
+                          'USTR-2015-0010-0001/content.htm')
+        client.job_operation()
+    captured = capsys.readouterr()
+    print_data = [
+        'Processing job from work server\n',
+        'Regulations.gov link: https://www.regulations.gov/document/type_id\n',
+        'API URL: https://api.regulations.gov/v4/documents/type_id\n',
+        'Performing job\n',
+        'Sending Job 1 to Work Server\n',
+        ('SAVED document HTM '
+            '- https://downloads.regulations.gov/USTR-2015-0010-0001/'
+            'content.htm to path:  '
+            '/NOAA/NOAA-0001-0001/text-NOAA-0001-0001/documents/'
+            '1_content.htm\n'),
+        'SUCCESS: https://api.regulations.gov/v4/documents/type_id complete\n'
+    ]
+    assert captured.out == "".join(print_data)
